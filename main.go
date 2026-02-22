@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/google/uuid"
@@ -65,8 +66,14 @@ func main() {
 		http.ServeFile(w, r, "index.html")
 	})
 
-	log.Println("🚀 SFU server starting on :9080")
-	log.Fatal(http.ListenAndServe(":9080", nil))
+	log.Println("🚀 SFU server starting on :8080")
+	
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
 func (s *SFU) handleWebSocket(w http.ResponseWriter, r *http.Request) {
