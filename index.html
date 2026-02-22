@@ -86,6 +86,10 @@
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             });
 
+            publisher.oniceconnectionstatechange = () => {
+                console.log('🧊 Publisher ICE state:', publisher.iceConnectionState);
+            };
+
             publisher.onconnectionstatechange = () => {
                 console.log('🔗 Publisher state:', publisher.connectionState);
                 if (publisher.connectionState === 'connected') {
@@ -135,6 +139,10 @@
             subscriber = new RTCPeerConnection({
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             });
+
+            subscriber.oniceconnectionstatechange = () => {
+                console.log('🧊 Subscriber ICE state:', subscriber.iceConnectionState);
+            };
 
             subscriber.ontrack = (e) => {
                 console.log('📺 Received track:', e.track.kind);
