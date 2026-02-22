@@ -1,14 +1,11 @@
-run = ["./sfu-test"]
-compile = ["go", "build", "-o", "sfu-test", "."]
+run = ["go", "run", "main.go"]
 
 [nix]
 channel = "stable-24_05"
 
 [unit]
 name = "Pion SFU Test"
-description = "WebRTC SFU using Pion"
 
 [[ports]]
 port = 8080
 protocol = "tcp"
-external = true
