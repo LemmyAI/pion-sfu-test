@@ -80,12 +80,22 @@ func NewSFU() *SFU {
 func main() {
 	sfu := NewSFU()
 
-	http.HandleFunc("/ws", sfu.handleWebSocket)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
+	// Health check endpoint (must be fast for Replit)
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
 	})
 
-	log.Println("🚀 SFU server starting on :8080")
+	http.HandleFunc("/ws", sfu.handleWebSocket)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.ServeFile(w, r, "index.html")
+			return
+		}
+		http.NotFound(w, r)
+	})
+
+	log.Println("🚀 SFU server starting...")
 	
 	port := os.Getenv("PORT")
 	if port == "" {
