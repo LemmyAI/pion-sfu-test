@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: pion-sfu-test
+    env: go
+    buildCommand: go build -o sfu-test .
+    startCommand: ./sfu-test
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8080
