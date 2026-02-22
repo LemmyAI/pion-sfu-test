@@ -47,18 +47,22 @@
 
                     case 'publish_answer':
                         if (publisher) {
+                            console.log('📝 Setting publish answer...');
                             await publisher.setRemoteDescription({ type: 'answer', sdp: data.sdp });
                             console.log('✅ Publisher connected (ICE in SDP)');
+                            document.getElementById('status').textContent += ' | Answer received';
                         }
                         break;
 
                     case 'subscribe_offer':
                         if (subscriber) {
+                            console.log('📝 Setting subscribe offer...');
                             await subscriber.setRemoteDescription({ type: 'offer', sdp: data.sdp });
                             const answer = await subscriber.createAnswer();
                             await subscriber.setLocalDescription(answer);
                             ws.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
                             console.log('✅ Subscriber answer sent');
+                            document.getElementById('status').textContent += ' | Answer sent';
                         }
                         break;
                 }

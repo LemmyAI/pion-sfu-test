@@ -288,10 +288,12 @@ func (s *SFU) handleSubscribe(client *Client) {
 	// Add all existing tracks from other clients
 	s.mu.RLock()
 	trackCount := 0
+	log.Printf("🔍 [%s] Looking for tracks from %d other clients", client.ID, len(s.clients))
 	for otherID, tracks := range s.tracks {
 		if otherID == client.ID {
 			continue
 		}
+		log.Printf("🔍 [%s] Client %s has %d tracks", client.ID, otherID, len(tracks))
 		for trackKey, track := range tracks {
 			if _, err := pc.AddTrack(track); err != nil {
 				log.Printf("❌ [%s] Failed to add %s track from %s: %v", client.ID, trackKey, otherID, err)
@@ -303,7 +305,11 @@ func (s *SFU) handleSubscribe(client *Client) {
 	}
 	s.mu.RUnlock()
 
-	log.Printf("📦 [%s] Subscriber has %d tracks from other clients", client.ID, trackCount)
+	if trackCount == 0 {
+		log.Printf("⚠️ [%s] No tracks available from other clients - publish first!", client.ID)
+	} else {
+		log.Printf("📦 [%s] Subscriber has %d tracks from other clients", client.ID, trackCount)
+	}
 
 	// Create offer
 	offer, err := pc.CreateOffer(nil)
