@@ -183,12 +183,13 @@ func (s *SFU) handlePublish(client *Client, sdp string) {
 		client.Publisher.Close()
 	}
 
-	// Configure ICE with public IP if available
+	// Configure ICE with public IP for NAT traversal
 	var settings webrtc.SettingEngine
-	if s.publicIP != "" {
-		settings.SetNAT1To1IPs([]string{s.publicIP}, webrtc.ICECandidateTypeHost)
-		log.Printf("🌐 [%s] Publisher using public IP: %s", client.ID, s.publicIP)
-	}
+	
+	// Use the Render hostname as a host candidate
+	// This allows clients to connect via the public URL
+	settings.SetNAT1To1IPs([]string{"sfu-test-2.onrender.com"}, webrtc.ICECandidateTypeHost)
+	log.Printf("🌐 [%s] Publisher using hostname: sfu-test-2.onrender.com", client.ID)
 	
 	// Create publisher PC with settings
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(settings))
@@ -305,12 +306,10 @@ func (s *SFU) handleSubscribe(client *Client) {
 		client.Subscriber.Close()
 	}
 
-	// Configure ICE with public IP if available
+	// Configure ICE with public hostname
 	var settings webrtc.SettingEngine
-	if s.publicIP != "" {
-		settings.SetNAT1To1IPs([]string{s.publicIP}, webrtc.ICECandidateTypeHost)
-		log.Printf("🌐 [%s] Subscriber using public IP: %s", client.ID, s.publicIP)
-	}
+	settings.SetNAT1To1IPs([]string{"sfu-test-2.onrender.com"}, webrtc.ICECandidateTypeHost)
+	log.Printf("🌐 [%s] Subscriber using hostname: sfu-test-2.onrender.com", client.ID)
 	
 	// Create subscriber PC with settings
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(settings))
