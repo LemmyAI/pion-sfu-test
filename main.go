@@ -50,27 +50,23 @@ type SFU struct {
 }
 
 func NewSFU() *SFU {
-	// Get public IP for ICE candidates (needed for WebRTC behind NAT)
-	publicIP := os.Getenv("PUBLIC_IP")
-	if publicIP == "" {
-		log.Println("⚠️ PUBLIC_IP not set, using STUN only")
-	}
-	
 	// STUN servers for NAT traversal
 	iceServers := []webrtc.ICEServer{
 		{URLs: []string{"stun:stun.l.google.com:19302"}},
 	}
 	
-	// Free TURN server - use TCP transport for better compatibility
+	// OpenRelay TURN server - supports TURNS (TLS) on port 443
+	// This works through firewalls and proxies that only allow HTTPS
 	iceServers = append(iceServers, webrtc.ICEServer{
 		URLs: []string{
-			"turn:openrelay.metered.ca:80?transport=tcp",
-			"turn:openrelay.metered.ca:80",
+			"turns:openrelay.metered.ca:443?transport=tcp",  // TURN over TLS (port 443)
+			"turn:openrelay.metered.ca:443?transport=tcp",   // TURN over TCP (port 443)
+			"turn:openrelay.metered.ca:80?transport=tcp",    // TURN over TCP (port 80)
 		},
 		Username:   "openrelayproject",
 		Credential: "openrelayproject",
 	})
-	log.Printf("🧊 Using OpenRelay TURN server (TCP)")
+	log.Printf("🧊 Using OpenRelay TURNS (TLS/443) for firewall traversal")
 	
 	log.Printf("🧊 ICE servers: %d configured", len(iceServers))
 	
@@ -78,7 +74,7 @@ func NewSFU() *SFU {
 		clients:    make(map[string]*Client),
 		tracks:     make(map[string]map[string]*webrtc.TrackLocalStaticRTP),
 		iceServers: iceServers,
-		publicIP:   publicIP,
+		publicIP:   os.Getenv("PUBLIC_IP"),
 	}
 }
 
