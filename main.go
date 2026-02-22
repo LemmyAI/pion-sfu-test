@@ -348,6 +348,8 @@ func (s *SFU) handleAnswer(client *Client, sdp string) {
 		return
 	}
 
+	log.Printf("📝 [%s] Setting subscriber answer (%d bytes)", client.ID, len(sdp))
+
 	if err := client.Subscriber.SetRemoteDescription(webrtc.SessionDescription{
 		Type: webrtc.SDPTypeAnswer,
 		SDP:  sdp,
@@ -356,7 +358,7 @@ func (s *SFU) handleAnswer(client *Client, sdp string) {
 		return
 	}
 
-	log.Printf("✅ [%s] Subscriber answer set", client.ID)
+	log.Printf("✅ [%s] Subscriber answer set - connection should establish", client.ID)
 }
 
 // handleICE handles ICE candidates
