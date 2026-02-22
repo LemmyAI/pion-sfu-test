@@ -29,21 +29,6 @@
         let myId = null;
         let publisher = null;
         let subscriber = null;
-        
-        // Queue ICE candidates until remote description is set
-        let publisherIceQueue = [];
-        let subscriberIceQueue = [];
-
-        async function processQueuedCandidates(pc, queue) {
-            while (queue.length > 0) {
-                const candidate = queue.shift();
-                try {
-                    await pc.addIceCandidate(candidate);
-                } catch (e) {
-                    console.warn('ICE candidate error:', e);
-                }
-            }
-        }
 
         async function connect() {
             if (ws) return;
@@ -63,9 +48,7 @@
                     case 'publish_answer':
                         if (publisher) {
                             await publisher.setRemoteDescription({ type: 'answer', sdp: data.sdp });
-                            console.log('✅ Publisher connected');
-                            // Process queued ICE candidates
-                            await processQueuedCandidates(publisher, publisherIceQueue);
+                            console.log('✅ Publisher connected (ICE in SDP)');
                         }
                         break;
 
@@ -75,36 +58,7 @@
                             const answer = await subscriber.createAnswer();
                             await subscriber.setLocalDescription(answer);
                             ws.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
-                            console.log('✅ Subscriber connected');
-                            // Process queued ICE candidates
-                            await processQueuedCandidates(subscriber, subscriberIceQueue);
-                        }
-                        break;
-
-                    case 'ice':
-                        console.log('🧊 ICE candidate for', data.target, ':', JSON.stringify(data.candidate));
-                        if (data.target === 'publish') {
-                            if (publisher && publisher.remoteDescription) {
-                                try {
-                                    await publisher.addIceCandidate(data.candidate);
-                                    console.log('✅ ICE added to publisher');
-                                } catch (e) {
-                                    console.warn('ICE publisher error:', e.message);
-                                }
-                            } else {
-                                publisherIceQueue.push(data.candidate);
-                            }
-                        } else {
-                            if (subscriber && subscriber.remoteDescription) {
-                                try {
-                                    await subscriber.addIceCandidate(data.candidate);
-                                    console.log('✅ ICE added to subscriber');
-                                } catch (e) {
-                                    console.warn('ICE subscriber error:', e.message);
-                                }
-                            } else {
-                                subscriberIceQueue.push(data.candidate);
-                            }
+                            console.log('✅ Subscriber answer sent');
                         }
                         break;
                 }
@@ -124,16 +78,9 @@
                 return;
             }
             
-            publisherIceQueue = [];
             publisher = new RTCPeerConnection({
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             });
-
-            publisher.onicecandidate = (e) => {
-                if (e.candidate && ws) {
-                    ws.send(JSON.stringify({ type: 'ice', target: 'publish', candidate: e.candidate.toJSON() }));
-                }
-            };
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             
@@ -150,8 +97,22 @@
             const offer = await publisher.createOffer();
             await publisher.setLocalDescription(offer);
             
-            ws.send(JSON.stringify({ type: 'publish', sdp: offer.sdp }));
-            console.log('📤 Publisher offer sent');
+            // Wait for ICE gathering to complete
+            await new Promise(resolve => {
+                if (publisher.iceGatheringState === 'complete') {
+                    resolve();
+                } else {
+                    publisher.onicegatheringstatechange = () => {
+                        if (publisher.iceGatheringState === 'complete') {
+                            resolve();
+                        }
+                    };
+                }
+            });
+            
+            // Send offer with all ICE candidates included
+            ws.send(JSON.stringify({ type: 'publish', sdp: publisher.localDescription.sdp }));
+            console.log('📤 Publisher offer sent (with ICE)');
         }
 
         async function subscribe() {
@@ -160,16 +121,9 @@
                 return;
             }
             
-            subscriberIceQueue = [];
             subscriber = new RTCPeerConnection({
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             });
-
-            subscriber.onicecandidate = (e) => {
-                if (e.candidate && ws) {
-                    ws.send(JSON.stringify({ type: 'ice', target: 'subscribe', candidate: e.candidate.toJSON() }));
-                }
-            };
 
             subscriber.ontrack = (e) => {
                 console.log('📺 Received track:', e.track.kind);
@@ -179,6 +133,7 @@
                 document.getElementById('videos').appendChild(video);
             };
 
+            // Request subscription
             ws.send(JSON.stringify({ type: 'subscribe' }));
             console.log('📤 Subscribe request sent');
         }

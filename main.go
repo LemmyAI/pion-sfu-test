@@ -226,19 +226,7 @@ func (s *SFU) handlePublish(client *Client, sdp string) {
 		}
 	})
 
-	// Handle ICE candidates
-	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c == nil {
-			return
-		}
-		candidateJSON := c.ToJSON()
-		log.Printf("🧊 [%s] Publisher ICE: %s", client.ID, candidateJSON.Candidate[:min(50, len(candidateJSON.Candidate))])
-		client.ws.WriteJSON(map[string]interface{}{
-			"type":      "ice",
-			"target":    "publish",
-			"candidate": candidateJSON,
-		})
-	})
+	// Disable trickle ICE - we'll gather all candidates before sending
 
 	// Set remote description
 	if err := pc.SetRemoteDescription(webrtc.SessionDescription{
@@ -256,15 +244,21 @@ func (s *SFU) handlePublish(client *Client, sdp string) {
 		return
 	}
 
+	// Set local description and wait for ICE gathering to complete
+	gatheringComplete := webrtc.GatheringCompletePromise(pc)
 	if err := pc.SetLocalDescription(answer); err != nil {
 		log.Printf("❌ [%s] Failed to set local description: %v", client.ID, err)
 		return
 	}
 
-	// Send answer to client
+	// Wait for ICE gathering to complete
+	<-gatheringComplete
+	log.Printf("✅ [%s] Publisher ICE gathering complete", client.ID)
+
+	// Send answer with candidates included
 	client.ws.WriteJSON(map[string]interface{}{
 		"type": "publish_answer",
-		"sdp":  answer.SDP,
+		"sdp":  pc.LocalDescription().SDP,
 	})
 
 	log.Printf("✅ [%s] Publisher established", client.ID)
@@ -289,19 +283,7 @@ func (s *SFU) handleSubscribe(client *Client) {
 	}
 	client.Subscriber = pc
 
-	// Handle ICE candidates
-	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
-		if c == nil {
-			return
-		}
-		candidateJSON := c.ToJSON()
-		log.Printf("🧊 [%s] Subscriber ICE: %s", client.ID, candidateJSON.Candidate[:min(50, len(candidateJSON.Candidate))])
-		client.ws.WriteJSON(map[string]interface{}{
-			"type":      "ice",
-			"target":    "subscribe",
-			"candidate": candidateJSON,
-		})
-	})
+	// Disable trickle ICE - we'll gather all candidates before sending
 
 	// Add all existing tracks from other clients
 	s.mu.RLock()
@@ -330,15 +312,21 @@ func (s *SFU) handleSubscribe(client *Client) {
 		return
 	}
 
+	// Set local description and wait for ICE gathering to complete
+	gatheringComplete := webrtc.GatheringCompletePromise(pc)
 	if err := pc.SetLocalDescription(offer); err != nil {
 		log.Printf("❌ [%s] Failed to set local description: %v", client.ID, err)
 		return
 	}
 
-	// Send offer to client
+	// Wait for ICE gathering to complete
+	<-gatheringComplete
+	log.Printf("✅ [%s] Subscriber ICE gathering complete", client.ID)
+
+	// Send offer with candidates included
 	client.ws.WriteJSON(map[string]interface{}{
 		"type": "subscribe_offer",
-		"sdp":  offer.SDP,
+		"sdp":  pc.LocalDescription().SDP,
 	})
 
 	log.Printf("✅ [%s] Subscriber offer sent", client.ID)
