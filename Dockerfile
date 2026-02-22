@@ -6,6 +6,7 @@ COPY . .
 RUN go build -o sfu-test .
 
 FROM alpine:latest
+RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=builder /app/sfu-test .
 COPY --from=builder /app/index.html .
