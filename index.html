@@ -82,15 +82,26 @@
                         break;
 
                     case 'ice':
+                        console.log('🧊 ICE candidate for', data.target, ':', JSON.stringify(data.candidate));
                         if (data.target === 'publish') {
                             if (publisher && publisher.remoteDescription) {
-                                await publisher.addIceCandidate(data.candidate);
+                                try {
+                                    await publisher.addIceCandidate(data.candidate);
+                                    console.log('✅ ICE added to publisher');
+                                } catch (e) {
+                                    console.warn('ICE publisher error:', e.message);
+                                }
                             } else {
                                 publisherIceQueue.push(data.candidate);
                             }
                         } else {
                             if (subscriber && subscriber.remoteDescription) {
-                                await subscriber.addIceCandidate(data.candidate);
+                                try {
+                                    await subscriber.addIceCandidate(data.candidate);
+                                    console.log('✅ ICE added to subscriber');
+                                } catch (e) {
+                                    console.warn('ICE subscriber error:', e.message);
+                                }
                             } else {
                                 subscriberIceQueue.push(data.candidate);
                             }

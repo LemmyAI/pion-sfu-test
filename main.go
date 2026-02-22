@@ -231,10 +231,12 @@ func (s *SFU) handlePublish(client *Client, sdp string) {
 		if c == nil {
 			return
 		}
+		candidateJSON := c.ToJSON()
+		log.Printf("🧊 [%s] Publisher ICE: %s", client.ID, candidateJSON.Candidate[:min(50, len(candidateJSON.Candidate))])
 		client.ws.WriteJSON(map[string]interface{}{
 			"type":      "ice",
 			"target":    "publish",
-			"candidate": c.ToJSON(),
+			"candidate": candidateJSON,
 		})
 	})
 
@@ -292,10 +294,12 @@ func (s *SFU) handleSubscribe(client *Client) {
 		if c == nil {
 			return
 		}
+		candidateJSON := c.ToJSON()
+		log.Printf("🧊 [%s] Subscriber ICE: %s", client.ID, candidateJSON.Candidate[:min(50, len(candidateJSON.Candidate))])
 		client.ws.WriteJSON(map[string]interface{}{
 			"type":      "ice",
 			"target":    "subscribe",
-			"candidate": c.ToJSON(),
+			"candidate": candidateJSON,
 		})
 	})
 
