@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pion SFU Test</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #1a1a2e; color: #eee; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        #videos { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+        video { width: 300px; height: 225px; background: #000; border-radius: 8px; }
+        .controls { margin: 20px 0; }
+        #status { margin: 20px 0; padding: 10px; background: #16213e; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🎥 Pion SFU Test</h1>
+    
+    <div id="status">Disconnected</div>
+    
+    <div class="controls">
+        <button onclick="connect()">Connect</button>
+        <button onclick="publish()">Publish Camera</button>
+        <button onclick="subscribe()">Subscribe</button>
+    </div>
+    
+    <div id="videos"></div>
+
+    <script>
+        const ws = new WebSocket(`ws://${location.host}/ws`);
+        let myId = null;
+        let publisher = null;  // For sending my media
+        let subscriber = null; // For receiving others' media
+
+        ws.onmessage = async (e) => {
+            const data = JSON.parse(e.data);
+            console.log('📩 Received:', data.type);
+
+            switch (data.type) {
+                case 'welcome':
+                    myId = data.id;
+                    document.getElementById('status').textContent = `Connected as ${myId}`;
+                    break;
+
+                case 'publish_answer':
+                    await publisher.setRemoteDescription({ type: 'answer', sdp: data.sdp });
+                    console.log('✅ Publisher connected');
+                    break;
+
+                case 'subscribe_offer':
+                    await subscriber.setRemoteDescription({ type: 'offer', sdp: data.sdp });
+                    const answer = await subscriber.createAnswer();
+                    await subscriber.setLocalDescription(answer);
+                    ws.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
+                    console.log('✅ Subscriber connected');
+                    break;
+
+                case 'ice':
+                    const pc = data.target === 'publish' ? publisher : subscriber;
+                    if (pc) {
+                        await pc.addIceCandidate(data.candidate);
+                    }
+                    break;
+            }
+        };
+
+        ws.onclose = () => {
+            document.getElementById('status').textContent = 'Disconnected';
+        };
+
+        async function connect() {
+            // Just wait for welcome
+            console.log('🔌 Connecting...');
+        }
+
+        async function publish() {
+            publisher = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+
+            publisher.onicecandidate = (e) => {
+                if (e.candidate) {
+                    ws.send(JSON.stringify({ type: 'ice', target: 'publish', candidate: e.candidate.toJSON() }));
+                }
+            };
+
+            // Get camera
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            
+            // Show my video
+            const myVideo = document.createElement('video');
+            myVideo.srcObject = stream;
+            myVideo.muted = true;
+            myVideo.autoplay = true;
+            document.getElementById('videos').appendChild(myVideo);
+
+            // Add tracks to publisher
+            stream.getTracks().forEach(track => {
+                publisher.addTrack(track, stream);
+            });
+
+            // Create offer
+            const offer = await publisher.createOffer();
+            await publisher.setLocalDescription(offer);
+            
+            ws.send(JSON.stringify({ type: 'publish', sdp: offer.sdp }));
+            console.log('📤 Publisher offer sent');
+        }
+
+        async function subscribe() {
+            subscriber = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+
+            subscriber.onicecandidate = (e) => {
+                if (e.candidate) {
+                    ws.send(JSON.stringify({ type: 'ice', target: 'subscribe', candidate: e.candidate.toJSON() }));
+                }
+            };
+
+            subscriber.ontrack = (e) => {
+                console.log('📺 Received track:', e.track.kind);
+                const video = document.createElement('video');
+                video.srcObject = e.streams[0];
+                video.autoplay = true;
+                document.getElementById('videos').appendChild(video);
+            };
+
+            // Request subscription
+            ws.send(JSON.stringify({ type: 'subscribe' }));
+            console.log('📤 Subscribe request sent');
+        }
+    </script>
+</body>
+</html>
