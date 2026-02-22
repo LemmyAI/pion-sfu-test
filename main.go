@@ -55,20 +55,19 @@ func NewSFU() *SFU {
 		{URLs: []string{"stun:stun.l.google.com:19302"}},
 	}
 	
-	// OpenRelay TURN server - supports TURNS (TLS) on port 443
-	// This works through firewalls and proxies that only allow HTTPS
+	// OpenRelay TURN server - static auth
+	// Using port 80 with TCP transport (most reliable for firewalls)
 	iceServers = append(iceServers, webrtc.ICEServer{
 		URLs: []string{
-			"turns:openrelay.metered.ca:443?transport=tcp",  // TURN over TLS (port 443)
-			"turn:openrelay.metered.ca:443?transport=tcp",   // TURN over TCP (port 443)
-			"turn:openrelay.metered.ca:80?transport=tcp",    // TURN over TCP (port 80)
+			"turn:staticauth.openrelay.metered.ca:80?transport=tcp",
+			"turn:staticauth.openrelay.metered.ca:443?transport=tcp",
+			"turn:staticauth.openrelay.metered.ca:80",
 		},
-		Username:   "openrelayproject",
-		Credential: "openrelayproject",
+		Username:       "openrelayproject",
+		Credential:     "openrelayprojectsecret",
+		CredentialType: webrtc.ICECredentialTypePassword,
 	})
-	log.Printf("🧊 Using OpenRelay TURNS (TLS/443) for firewall traversal")
-	
-	log.Printf("🧊 ICE servers: %d configured", len(iceServers))
+	log.Printf("🧊 Using OpenRelay TURN with static auth")
 	
 	return &SFU{
 		clients:    make(map[string]*Client),
