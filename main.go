@@ -59,21 +59,18 @@ func NewSFU() *SFU {
 	// STUN servers for NAT traversal
 	iceServers := []webrtc.ICEServer{
 		{URLs: []string{"stun:stun.l.google.com:19302"}},
-		{URLs: []string{"stun:stun1.l.google.com:19302"}},
 	}
 	
-	// Free TURN server from OpenRelay (works behind strict NATs)
-	// Note: For production, use your own TURN server
+	// Free TURN server - use TCP transport for better compatibility
 	iceServers = append(iceServers, webrtc.ICEServer{
 		URLs: []string{
+			"turn:openrelay.metered.ca:80?transport=tcp",
 			"turn:openrelay.metered.ca:80",
-			"turn:openrelay.metered.ca:443",
-			"turn:openrelay.metered.ca:3478",
 		},
 		Username:   "openrelayproject",
 		Credential: "openrelayproject",
 	})
-	log.Printf("🧊 Using OpenRelay TURN server for NAT traversal")
+	log.Printf("🧊 Using OpenRelay TURN server (TCP)")
 	
 	log.Printf("🧊 ICE servers: %d configured", len(iceServers))
 	

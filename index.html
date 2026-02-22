@@ -85,12 +85,10 @@
             publisher = new RTCPeerConnection({
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
                     {
                         urls: [
-                            'turn:openrelay.metered.ca:80',
-                            'turn:openrelay.metered.ca:443',
-                            'turn:openrelay.metered.ca:3478'
+                            'turn:openrelay.metered.ca:80?transport=tcp',
+                            'turn:openrelay.metered.ca:80'
                         ],
                         username: 'openrelayproject',
                         credential: 'openrelayproject'
@@ -130,8 +128,18 @@
                     resolve();
                 } else {
                     publisher.onicegatheringstatechange = () => {
+                        console.log('🧊 Publisher gathering state:', publisher.iceGatheringState);
                         if (publisher.iceGatheringState === 'complete') {
                             resolve();
+                        }
+                    };
+                    // Also log candidates as they come
+                    publisher.onicecandidate = (e) => {
+                        if (e.candidate) {
+                            const type = e.candidate.candidate.includes('relay') ? 'RELAY' : 
+                                         e.candidate.candidate.includes('srflx') ? 'SRFLX' :
+                                         e.candidate.candidate.includes('host') ? 'HOST' : 'OTHER';
+                            console.log('🧊 Publisher ICE:', type, e.candidate.candidate.substring(0, 50) + '...');
                         }
                     };
                 }
@@ -151,12 +159,10 @@
             subscriber = new RTCPeerConnection({
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
                     {
                         urls: [
-                            'turn:openrelay.metered.ca:80',
-                            'turn:openrelay.metered.ca:443',
-                            'turn:openrelay.metered.ca:3478'
+                            'turn:openrelay.metered.ca:80?transport=tcp',
+                            'turn:openrelay.metered.ca:80'
                         ],
                         username: 'openrelayproject',
                         credential: 'openrelayproject'
@@ -166,6 +172,15 @@
 
             subscriber.oniceconnectionstatechange = () => {
                 console.log('🧊 Subscriber ICE state:', subscriber.iceConnectionState);
+            };
+
+            subscriber.onicecandidate = (e) => {
+                if (e.candidate) {
+                    const type = e.candidate.candidate.includes('relay') ? 'RELAY' : 
+                                 e.candidate.candidate.includes('srflx') ? 'SRFLX' :
+                                 e.candidate.candidate.includes('host') ? 'HOST' : 'OTHER';
+                    console.log('🧊 Subscriber ICE:', type, e.candidate.candidate.substring(0, 50) + '...');
+                }
             };
 
             subscriber.ontrack = (e) => {
