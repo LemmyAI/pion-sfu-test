@@ -7,5 +7,5 @@ channel = "stable-24_05"
 name = "Pion SFU Test"
 
 [[ports]]
-port = 8080
+port = 5000
 protocol = "tcp"
