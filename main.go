@@ -46,15 +46,24 @@ type SFU struct {
 	tracks     map[string]map[string]*webrtc.TrackLocalStaticRTP // clientID -> trackID -> track
 	mu         sync.RWMutex
 	iceServers []webrtc.ICEServer
+	publicIP   string
 }
 
 func NewSFU() *SFU {
+	// Get public IP for ICE candidates (needed for WebRTC behind NAT)
+	publicIP := os.Getenv("PUBLIC_IP")
+	if publicIP == "" {
+		// Try to detect from Render's headers or use hostname
+		log.Println("⚠️ PUBLIC_IP not set, ICE may fail behind NAT")
+	}
+	
 	return &SFU{
 		clients: make(map[string]*Client),
 		tracks:  make(map[string]map[string]*webrtc.TrackLocalStaticRTP),
 		iceServers: []webrtc.ICEServer{
 			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},
+		publicIP: publicIP,
 	}
 }
 
@@ -159,8 +168,16 @@ func (s *SFU) handlePublish(client *Client, sdp string) {
 		client.Publisher.Close()
 	}
 
-	// Create publisher PC
-	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{
+	// Configure ICE with public IP if available
+	var settings webrtc.SettingEngine
+	if s.publicIP != "" {
+		settings.SetNAT1To1IPs([]string{s.publicIP}, webrtc.ICECandidateTypeHost)
+		log.Printf("🌐 [%s] Publisher using public IP: %s", client.ID, s.publicIP)
+	}
+	
+	// Create publisher PC with settings
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(settings))
+	pc, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: s.iceServers,
 	})
 	if err != nil {
@@ -273,8 +290,16 @@ func (s *SFU) handleSubscribe(client *Client) {
 		client.Subscriber.Close()
 	}
 
-	// Create subscriber PC
-	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{
+	// Configure ICE with public IP if available
+	var settings webrtc.SettingEngine
+	if s.publicIP != "" {
+		settings.SetNAT1To1IPs([]string{s.publicIP}, webrtc.ICECandidateTypeHost)
+		log.Printf("🌐 [%s] Subscriber using public IP: %s", client.ID, s.publicIP)
+	}
+	
+	// Create subscriber PC with settings
+	api := webrtc.NewAPI(webrtc.WithSettingEngine(settings))
+	pc, err := api.NewPeerConnection(webrtc.Configuration{
 		ICEServers: s.iceServers,
 	})
 	if err != nil {
