@@ -27,11 +27,26 @@
     <script>
         let ws = null;
         let myId = null;
-        let publisher = null;  // For sending my media
-        let subscriber = null; // For receiving others' media
+        let publisher = null;
+        let subscriber = null;
+        
+        // Queue ICE candidates until remote description is set
+        let publisherIceQueue = [];
+        let subscriberIceQueue = [];
+
+        async function processQueuedCandidates(pc, queue) {
+            while (queue.length > 0) {
+                const candidate = queue.shift();
+                try {
+                    await pc.addIceCandidate(candidate);
+                } catch (e) {
+                    console.warn('ICE candidate error:', e);
+                }
+            }
+        }
 
         async function connect() {
-            if (ws) return; // Already connected
+            if (ws) return;
             
             ws = new WebSocket(`wss://${location.host}/ws`);
             
@@ -49,6 +64,8 @@
                         if (publisher) {
                             await publisher.setRemoteDescription({ type: 'answer', sdp: data.sdp });
                             console.log('✅ Publisher connected');
+                            // Process queued ICE candidates
+                            await processQueuedCandidates(publisher, publisherIceQueue);
                         }
                         break;
 
@@ -59,13 +76,24 @@
                             await subscriber.setLocalDescription(answer);
                             ws.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
                             console.log('✅ Subscriber connected');
+                            // Process queued ICE candidates
+                            await processQueuedCandidates(subscriber, subscriberIceQueue);
                         }
                         break;
 
                     case 'ice':
-                        const pc = data.target === 'publish' ? publisher : subscriber;
-                        if (pc) {
-                            await pc.addIceCandidate(data.candidate);
+                        if (data.target === 'publish') {
+                            if (publisher && publisher.remoteDescription) {
+                                await publisher.addIceCandidate(data.candidate);
+                            } else {
+                                publisherIceQueue.push(data.candidate);
+                            }
+                        } else {
+                            if (subscriber && subscriber.remoteDescription) {
+                                await subscriber.addIceCandidate(data.candidate);
+                            } else {
+                                subscriberIceQueue.push(data.candidate);
+                            }
                         }
                         break;
                 }
@@ -85,6 +113,7 @@
                 return;
             }
             
+            publisherIceQueue = [];
             publisher = new RTCPeerConnection({
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             });
@@ -95,22 +124,18 @@
                 }
             };
 
-            // Get camera
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             
-            // Show my video
             const myVideo = document.createElement('video');
             myVideo.srcObject = stream;
             myVideo.muted = true;
             myVideo.autoplay = true;
             document.getElementById('videos').appendChild(myVideo);
 
-            // Add tracks to publisher
             stream.getTracks().forEach(track => {
                 publisher.addTrack(track, stream);
             });
 
-            // Create offer
             const offer = await publisher.createOffer();
             await publisher.setLocalDescription(offer);
             
@@ -124,6 +149,7 @@
                 return;
             }
             
+            subscriberIceQueue = [];
             subscriber = new RTCPeerConnection({
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             });
@@ -142,7 +168,6 @@
                 document.getElementById('videos').appendChild(video);
             };
 
-            // Request subscription
             ws.send(JSON.stringify({ type: 'subscribe' }));
             console.log('📤 Subscribe request sent');
         }
