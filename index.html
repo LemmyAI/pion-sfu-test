@@ -83,7 +83,19 @@
             }
             
             publisher = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    {
+                        urls: [
+                            'turn:openrelay.metered.ca:80',
+                            'turn:openrelay.metered.ca:443',
+                            'turn:openrelay.metered.ca:3478'
+                        ],
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                ]
             });
 
             publisher.oniceconnectionstatechange = () => {
@@ -137,7 +149,19 @@
             }
             
             subscriber = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    {
+                        urls: [
+                            'turn:openrelay.metered.ca:80',
+                            'turn:openrelay.metered.ca:443',
+                            'turn:openrelay.metered.ca:3478'
+                        ],
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                ]
             });
 
             subscriber.oniceconnectionstatechange = () => {
