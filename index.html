@@ -82,6 +82,13 @@
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
             });
 
+            publisher.onconnectionstatechange = () => {
+                console.log('🔗 Publisher state:', publisher.connectionState);
+                if (publisher.connectionState === 'connected') {
+                    document.getElementById('status').textContent += ' | ✅ Published';
+                }
+            };
+
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             
             const myVideo = document.createElement('video');
@@ -131,6 +138,14 @@
                 video.srcObject = e.streams[0];
                 video.autoplay = true;
                 document.getElementById('videos').appendChild(video);
+                document.getElementById('status').textContent += ` | 📹 ${e.track.kind}`;
+            };
+
+            subscriber.onconnectionstatechange = () => {
+                console.log('🔗 Subscriber state:', subscriber.connectionState);
+                if (subscriber.connectionState === 'connected') {
+                    document.getElementById('status').textContent += ' | ✅ Connected';
+                }
             };
 
             // Request subscription
