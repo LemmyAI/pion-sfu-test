@@ -6,7 +6,7 @@ services:
     networks:
       - traefik-public
     environment:
-      - PUBLIC_IP=38.242.159.27
+      - PUBLIC_IP=${PUBLIC_IP:-}  # Pass from host: PUBLIC_IP=192.168.0.39 docker compose up -d
     labels:
       - "traefik.enable=true"
       # HTTP router

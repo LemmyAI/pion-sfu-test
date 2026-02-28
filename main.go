@@ -441,23 +441,35 @@ func (s *SFU) handleICE(client *Client, target string, candidate interface{}) {
 	}
 }
 // Auto-detect public IP
+// Auto-detect public IP
 func getPublicIP() string {
 	// Try PUBLIC_IP env var first
 	if ip := os.Getenv("PUBLIC_IP"); ip != "" {
+		log.Printf("🌐 Using PUBLIC_IP from env: %s", ip)
 		return ip
 	}
-	
-	// Try to get IP from eth0 (common on servers)
-	iface, err := net.InterfaceByName("eth0")
-	if err == nil {
+
+	// Try all interfaces for non-localhost IPv4
+	ifaces, _ := net.Interfaces()
+	for _, iface := range ifaces {
+		// Skip loopback
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
 		addrs, err := iface.Addrs()
-		if err == nil && len(addrs) > 0 {
-			if ipnet, ok := addrs[0].(*net.IPNet); ok && ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+				ip := ipnet.IP.String()
+				log.Printf("🌐 Auto-detected IP from %s: %s", iface.Name, ip)
+				return ip
 			}
 		}
 	}
-	
+
 	// Fallback to localhost for local dev
+	log.Printf("🌐 No external IP found, using localhost")
 	return "localhost"
 }
