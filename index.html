@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pion SFU Test (LAN)</title>
+    <title>Pion SFU Test</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #1a1a2e; color: #eee; }
         button { padding: 10px 20px; margin: 5px; cursor: pointer; }
@@ -12,7 +12,7 @@
     </style>
 </head>
 <body>
-    <h1>🎥 Pion SFU Test (LAN Only)</h1>
+    <h1>🎥 Pion SFU Test</h1>
     
     <div id="status">Disconnected</div>
     
@@ -44,13 +44,14 @@
                         break;
                     case 'publish_answer':
                         if (publisher) {
+                            console.log('📝 Setting publish answer...');
                             await publisher.setRemoteDescription({ type: 'answer', sdp: data.sdp });
                             console.log('✅ Publisher connected');
-                            document.getElementById('status').textContent += ' | ✅ Published';
                         }
                         break;
                     case 'subscribe_offer':
                         if (subscriber) {
+                            console.log('📝 Setting subscribe offer...');
                             await subscriber.setRemoteDescription({ type: 'offer', sdp: data.sdp });
                             const answer = await subscriber.createAnswer();
                             await subscriber.setLocalDescription(answer);
@@ -67,11 +68,13 @@
         async function publish() {
             if (!ws || ws.readyState !== WebSocket.OPEN) { alert('Connect first!'); return; }
             
-            // NO STUN/TURN - LAN only!
-            publisher = new RTCPeerConnection({ iceServers: [] });
+            // STUN for public IP discovery, no TURN (will use host candidates on same network)
+            publisher = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
             
-            publisher.oniceconnectionstatechange = () => console.log('🧊 ICE:', publisher.iceConnectionState);
-            publisher.onconnectionstatechange = () => console.log('🔗 State:', publisher.connectionState);
+            publisher.oniceconnectionstatechange = () => console.log('🧊 PUB ICE:', publisher.iceConnectionState);
+            publisher.onconnectionstatechange = () => console.log('🔗 PUB State:', publisher.connectionState);
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             const myVideo = document.createElement('video');
@@ -84,28 +87,45 @@
             const offer = await publisher.createOffer();
             await publisher.setLocalDescription(offer);
             
-            // Short timeout for LAN
+            // Wait for ICE with timeout
+            let iceDone = false;
             await new Promise(resolve => {
-                if (publisher.iceGatheringState === 'complete') return resolve();
-                const timeout = setTimeout(() => { console.log('⏱️ ICE timeout'); resolve(); }, 2000);
-                publisher.onicegatheringstatechange = () => {
-                    if (publisher.iceGatheringState === 'complete') { clearTimeout(timeout); resolve(); }
-                };
+                const timeout = setTimeout(() => {
+                    if (!iceDone) { iceDone = true; console.log('⏱️ ICE timeout, sending anyway'); resolve(); }
+                }, 3000);
+                
                 publisher.onicecandidate = (e) => {
-                    if (e.candidate) console.log('🧊 ICE:', e.candidate.candidate.substring(0, 50));
-                    else { clearTimeout(timeout); console.log('🧊 ICE done'); resolve(); }
+                    if (e.candidate) {
+                        const type = e.candidate.candidate.includes('srflx') ? 'SRFLX' : 
+                                     e.candidate.candidate.includes('host') ? 'HOST' : 'RELAY';
+                        console.log('🧊 PUB ICE:', type, e.candidate.candidate.substring(0, 50));
+                    } else {
+                        clearTimeout(timeout);
+                        iceDone = true;
+                        console.log('🧊 PUB ICE complete');
+                        resolve();
+                    }
                 };
+                
+                if (publisher.iceGatheringState === 'complete') {
+                    clearTimeout(timeout);
+                    iceDone = true;
+                    resolve();
+                }
             });
 
             ws.send(JSON.stringify({ type: 'publish', sdp: publisher.localDescription.sdp }));
-            console.log('📤 Offer sent');
+            console.log('📤 Publisher offer sent');
         }
 
         async function subscribe() {
             if (!ws || ws.readyState !== WebSocket.OPEN) { alert('Connect first!'); return; }
             
-            subscriber = new RTCPeerConnection({ iceServers: [] });
-            subscriber.oniceconnectionstatechange = () => console.log('🧊 ICE:', subscriber.iceConnectionState);
+            subscriber = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+            
+            subscriber.oniceconnectionstatechange = () => console.log('🧊 SUB ICE:', subscriber.iceConnectionState);
             subscriber.ontrack = (e) => {
                 console.log('📹 Got track:', e.track.kind);
                 const video = document.createElement('video');
