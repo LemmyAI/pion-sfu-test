@@ -33,7 +33,7 @@
         async function connect() {
             if (ws) return;
             
-            ws = new WebSocket(`wss://${location.host}/ws`);
+            ws = new WebSocket(`wss://${location.host}/sfu/ws`);
             
             ws.onmessage = async (e) => {
                 const data = JSON.parse(e.data);

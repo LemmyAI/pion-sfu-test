@@ -1,8 +1,7 @@
 version: '3.3'
 services:
-  sfu-test:
+  sfu:
     build: .
-    container_name: sfu-test
     restart: unless-stopped
     networks:
       - traefik-public
@@ -13,14 +12,15 @@ services:
       # HTTP router
       - "traefik.http.routers.sfu.rule=PathPrefix(`/sfu`)"
       - "traefik.http.routers.sfu.entrypoints=web"
+      - "traefik.http.routers.sfu.middlewares=sfu-strip"
       - "traefik.http.services.sfu.loadbalancer.server.port=8081"
-      - "traefik.http.middlewares.sfu-stripprefix.stripprefix.prefixes=/sfu"
-      - "traefik.http.routers.sfu.middlewares=sfu-stripprefix"
       # HTTPS router
       - "traefik.http.routers.sfu-secure.rule=PathPrefix(`/sfu`)"
       - "traefik.http.routers.sfu-secure.entrypoints=websecure"
+      - "traefik.http.routers.sfu-secure.middlewares=sfu-strip"
       - "traefik.http.routers.sfu-secure.tls=true"
-      - "traefik.http.routers.sfu-secure.middlewares=sfu-stripprefix"
+      # Middleware
+      - "traefik.http.middlewares.sfu-strip.stripprefix.prefixes=/sfu"
 
 networks:
   traefik-public:
