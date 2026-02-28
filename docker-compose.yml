@@ -2,6 +2,7 @@ version: '3.3'
 services:
   sfu-test:
     build: .
+    container_name: sfu-test
     restart: unless-stopped
     networks:
       - traefik-public
