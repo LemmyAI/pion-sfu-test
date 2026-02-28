@@ -1,0 +1,20 @@
+version: '3.3'
+services:
+  sfu-test:
+    build: .
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    environment:
+      - PUBLIC_IP=38.242.159.27
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sfu.rule=PathPrefix(`/sfu`)"
+      - "traefik.http.routers.sfu.entrypoints=web"
+      - "traefik.http.services.sfu.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.sfu-stripprefix.stripprefix.prefixes=/sfu"
+      - "traefik.http.routers.sfu.middlewares=sfu-stripprefix"
+
+networks:
+  traefik-public:
+    external: true

@@ -1,0 +1,3 @@
+# Infrastructure marker - enables auto-deploy
+app: sfu-test
+port: 8080
