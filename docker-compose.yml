@@ -10,11 +10,17 @@ services:
       - PUBLIC_IP=38.242.159.27
     labels:
       - "traefik.enable=true"
+      # HTTP router
       - "traefik.http.routers.sfu.rule=PathPrefix(`/sfu`)"
       - "traefik.http.routers.sfu.entrypoints=web"
       - "traefik.http.services.sfu.loadbalancer.server.port=8081"
       - "traefik.http.middlewares.sfu-stripprefix.stripprefix.prefixes=/sfu"
       - "traefik.http.routers.sfu.middlewares=sfu-stripprefix"
+      # HTTPS router
+      - "traefik.http.routers.sfu-secure.rule=PathPrefix(`/sfu`)"
+      - "traefik.http.routers.sfu-secure.entrypoints=websecure"
+      - "traefik.http.routers.sfu-secure.tls=true"
+      - "traefik.http.routers.sfu-secure.middlewares=sfu-stripprefix"
 
 networks:
   traefik-public:
