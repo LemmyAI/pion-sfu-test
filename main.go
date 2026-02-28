@@ -56,19 +56,7 @@ func NewSFU() *SFU {
 		{URLs: []string{"stun:stun.l.google.com:19302"}},
 	}
 	
-	// OpenRelay TURN server - static auth
-	// Using port 80 with TCP transport (most reliable for firewalls)
-	iceServers = append(iceServers, webrtc.ICEServer{
-		URLs: []string{
-			"turn:staticauth.openrelay.metered.ca:80?transport=tcp",
-			"turn:staticauth.openrelay.metered.ca:443?transport=tcp",
-			"turn:staticauth.openrelay.metered.ca:80",
-		},
-		Username:       "openrelayproject",
-		Credential:     "openrelayprojectsecret",
-		CredentialType: webrtc.ICECredentialTypePassword,
-	})
-	log.Printf("🧊 Using OpenRelay TURN with static auth")
+log.Printf("🧊 Using STUN only (no TURN)")
 	
 	return &SFU{
 		clients:    make(map[string]*Client),
