@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -73,7 +74,7 @@ func NewSFU() *SFU {
 		clients:    make(map[string]*Client),
 		tracks:     make(map[string]map[string]*webrtc.TrackLocalStaticRTP),
 		iceServers: iceServers,
-		publicIP:   os.Getenv("PUBLIC_IP"),
+		publicIP:   getPublicIP(),
 	}
 }
 
@@ -438,4 +439,25 @@ func (s *SFU) handleICE(client *Client, target string, candidate interface{}) {
 	} else {
 		log.Printf("🧊 [%s] ICE candidate added to %s", client.ID, target)
 	}
+}
+// Auto-detect public IP
+func getPublicIP() string {
+	// Try PUBLIC_IP env var first
+	if ip := os.Getenv("PUBLIC_IP"); ip != "" {
+		return ip
+	}
+	
+	// Try to get IP from eth0 (common on servers)
+	iface, err := net.InterfaceByName("eth0")
+	if err == nil {
+		addrs, err := iface.Addrs()
+		if err == nil && len(addrs) > 0 {
+			if ipnet, ok := addrs[0].(*net.IPNet); ok && ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	
+	// Fallback to localhost for local dev
+	return "localhost"
 }
