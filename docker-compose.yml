@@ -12,7 +12,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.sfu.rule=PathPrefix(`/sfu`)"
       - "traefik.http.routers.sfu.entrypoints=web"
-      - "traefik.http.services.sfu.loadbalancer.server.port=8080"
+      - "traefik.http.services.sfu.loadbalancer.server.port=8081"
       - "traefik.http.middlewares.sfu-stripprefix.stripprefix.prefixes=/sfu"
       - "traefik.http.routers.sfu.middlewares=sfu-stripprefix"
 
