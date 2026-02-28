@@ -78,6 +78,31 @@ func NewSFU() *SFU {
 	}
 }
 
+
+// isPrivateIP checks if IP is in private/CIDR range
+func isPrivateIP(ip string) bool {
+	ipAddr := net.ParseIP(ip)
+	if ipAddr == nil {
+		return true
+	}
+	privateRanges := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+	}
+	for _, cidr := range privateRanges {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			continue
+		}
+		if network.Contains(ipAddr) {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	sfu := NewSFU()
 
@@ -197,8 +222,13 @@ func (s *SFU) handlePublish(client *Client, sdp string) {
 	if publicIP == "" {
 		publicIP = "localhost"
 	}
-	settings.SetNAT1To1IPs([]string{publicIP}, webrtc.ICECandidateTypeHost)
-	log.Printf("🌐 [%s] Publisher using host: %s", client.ID, publicIP)
+	// Use ServerReflex for public IPs, Host for private
+	candidateType := webrtc.ICECandidateTypeHost
+	if !isPrivateIP(publicIP) && publicIP != "localhost" {
+		candidateType = webrtc.ICECandidateTypeHost
+	}
+	settings.SetNAT1To1IPs([]string{publicIP}, candidateType)
+	log.Printf("🌐 [%s] Publisher using %s: %s", client.ID, candidateType, publicIP)
 	// Create publisher PC with settings
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(settings))
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
@@ -320,8 +350,12 @@ func (s *SFU) handleSubscribe(client *Client) {
 	if publicIP == "" {
 		publicIP = "localhost"
 	}
-	settings.SetNAT1To1IPs([]string{publicIP}, webrtc.ICECandidateTypeHost)
-	log.Printf("🌐 [%s] Subscriber using host: %s", client.ID, publicIP)
+	candidateType := webrtc.ICECandidateTypeHost
+	if !isPrivateIP(publicIP) && publicIP != "localhost" {
+		candidateType = webrtc.ICECandidateTypeHost
+	}
+	settings.SetNAT1To1IPs([]string{publicIP}, candidateType)
+	log.Printf("🌐 [%s] Subscriber using %s: %s", client.ID, candidateType, publicIP)
 	// Create subscriber PC with settings
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(settings))
 	pc, err := api.NewPeerConnection(webrtc.Configuration{
