@@ -144,6 +144,7 @@ func (s *SFU) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 
 		msgType, _ := data["type"].(string)
+		log.Printf("📩 [%s] Message: %s", clientID, msgType)
 		switch msgType {
 		case "publish":
 			// Client wants to publish (send media)
