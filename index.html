@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pion SFU Test</title>
+    <title>Pion SFU Test (LAN)</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #1a1a2e; color: #eee; }
         button { padding: 10px 20px; margin: 5px; cursor: pointer; }
@@ -12,7 +12,7 @@
     </style>
 </head>
 <body>
-    <h1>🎥 Pion SFU Test</h1>
+    <h1>🎥 Pion SFU Test (LAN Only)</h1>
     
     <div id="status">Disconnected</div>
     
@@ -32,176 +32,88 @@
 
         async function connect() {
             if (ws) return;
-            
             ws = new WebSocket(`wss://${location.host}/sfu/ws`);
             
             ws.onmessage = async (e) => {
                 const data = JSON.parse(e.data);
                 console.log('📩 Received:', data.type);
-
                 switch (data.type) {
                     case 'welcome':
                         myId = data.id;
                         document.getElementById('status').textContent = `Connected as ${myId}`;
                         break;
-
                     case 'publish_answer':
                         if (publisher) {
-                            console.log('📝 Setting publish answer...');
                             await publisher.setRemoteDescription({ type: 'answer', sdp: data.sdp });
-                            console.log('✅ Publisher connected (ICE in SDP)');
-                            document.getElementById('status').textContent += ' | Answer received';
+                            console.log('✅ Publisher connected');
+                            document.getElementById('status').textContent += ' | ✅ Published';
                         }
                         break;
-
                     case 'subscribe_offer':
                         if (subscriber) {
-                            console.log('📝 Setting subscribe offer...');
                             await subscriber.setRemoteDescription({ type: 'offer', sdp: data.sdp });
                             const answer = await subscriber.createAnswer();
                             await subscriber.setLocalDescription(answer);
                             ws.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
                             console.log('✅ Subscriber answer sent');
-                            document.getElementById('status').textContent += ' | Answer sent';
                         }
                         break;
                 }
             };
-
-            ws.onclose = () => {
-                document.getElementById('status').textContent = 'Disconnected';
-                ws = null;
-            };
-            
+            ws.onclose = () => { document.getElementById('status').textContent = 'Disconnected'; ws = null; };
             console.log('🔌 Connecting...');
         }
 
         async function publish() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                alert('Please connect first!');
-                return;
-            }
+            if (!ws || ws.readyState !== WebSocket.OPEN) { alert('Connect first!'); return; }
             
-            publisher = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    {
-                        urls: [
-                            'turn:staticauth.openrelay.metered.ca:80?transport=tcp',
-                            'turn:staticauth.openrelay.metered.ca:443?transport=tcp',
-                            'turn:staticauth.openrelay.metered.ca:80'
-                        ],
-                        username: 'openrelayproject',
-                        credential: 'openrelayprojectsecret'
-                    }
-                ]
-            });
-
-            publisher.oniceconnectionstatechange = () => {
-                console.log('🧊 Publisher ICE state:', publisher.iceConnectionState);
-            };
-
-            publisher.onconnectionstatechange = () => {
-                console.log('🔗 Publisher state:', publisher.connectionState);
-                if (publisher.connectionState === 'connected') {
-                    document.getElementById('status').textContent += ' | ✅ Published';
-                }
-            };
+            // NO STUN/TURN - LAN only!
+            publisher = new RTCPeerConnection({ iceServers: [] });
+            
+            publisher.oniceconnectionstatechange = () => console.log('🧊 ICE:', publisher.iceConnectionState);
+            publisher.onconnectionstatechange = () => console.log('🔗 State:', publisher.connectionState);
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-            
             const myVideo = document.createElement('video');
             myVideo.srcObject = stream;
             myVideo.muted = true;
             myVideo.autoplay = true;
             document.getElementById('videos').appendChild(myVideo);
-
-            stream.getTracks().forEach(track => {
-                publisher.addTrack(track, stream);
-            });
+            stream.getTracks().forEach(track => publisher.addTrack(track, stream));
 
             const offer = await publisher.createOffer();
             await publisher.setLocalDescription(offer);
             
-            // Wait for ICE gathering to complete
+            // Short timeout for LAN
             await new Promise(resolve => {
-                if (publisher.iceGatheringState === 'complete') {
-                    resolve();
-                } else {
-                    publisher.onicegatheringstatechange = () => {
-                        console.log('🧊 Publisher gathering state:', publisher.iceGatheringState);
-                        if (publisher.iceGatheringState === 'complete') {
-                            resolve();
-                        }
-                    };
-                    // Also log candidates as they come
-                    publisher.onicecandidate = (e) => {
-                        if (e.candidate) {
-                            const type = e.candidate.candidate.includes('relay') ? 'RELAY' : 
-                                         e.candidate.candidate.includes('srflx') ? 'SRFLX' :
-                                         e.candidate.candidate.includes('host') ? 'HOST' : 'OTHER';
-                            console.log('🧊 Publisher ICE:', type, e.candidate.candidate.substring(0, 50) + '...');
-                        }
-                    };
-                }
+                if (publisher.iceGatheringState === 'complete') return resolve();
+                const timeout = setTimeout(() => { console.log('⏱️ ICE timeout'); resolve(); }, 2000);
+                publisher.onicegatheringstatechange = () => {
+                    if (publisher.iceGatheringState === 'complete') { clearTimeout(timeout); resolve(); }
+                };
+                publisher.onicecandidate = (e) => {
+                    if (e.candidate) console.log('🧊 ICE:', e.candidate.candidate.substring(0, 50));
+                    else { clearTimeout(timeout); console.log('🧊 ICE done'); resolve(); }
+                };
             });
-            
-            // Send offer with all ICE candidates included
+
             ws.send(JSON.stringify({ type: 'publish', sdp: publisher.localDescription.sdp }));
-            console.log('📤 Publisher offer sent (with ICE)');
+            console.log('📤 Offer sent');
         }
 
         async function subscribe() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                alert('Please connect first!');
-                return;
-            }
+            if (!ws || ws.readyState !== WebSocket.OPEN) { alert('Connect first!'); return; }
             
-            subscriber = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    {
-                        urls: [
-                            'turn:staticauth.openrelay.metered.ca:80?transport=tcp',
-                            'turn:staticauth.openrelay.metered.ca:443?transport=tcp',
-                            'turn:staticauth.openrelay.metered.ca:80'
-                        ],
-                        username: 'openrelayproject',
-                        credential: 'openrelayprojectsecret'
-                    }
-                ]
-            });
-
-            subscriber.oniceconnectionstatechange = () => {
-                console.log('🧊 Subscriber ICE state:', subscriber.iceConnectionState);
-            };
-
-            subscriber.onicecandidate = (e) => {
-                if (e.candidate) {
-                    const type = e.candidate.candidate.includes('relay') ? 'RELAY' : 
-                                 e.candidate.candidate.includes('srflx') ? 'SRFLX' :
-                                 e.candidate.candidate.includes('host') ? 'HOST' : 'OTHER';
-                    console.log('🧊 Subscriber ICE:', type, e.candidate.candidate.substring(0, 50) + '...');
-                }
-            };
-
+            subscriber = new RTCPeerConnection({ iceServers: [] });
+            subscriber.oniceconnectionstatechange = () => console.log('🧊 ICE:', subscriber.iceConnectionState);
             subscriber.ontrack = (e) => {
-                console.log('📺 Received track:', e.track.kind);
+                console.log('📹 Got track:', e.track.kind);
                 const video = document.createElement('video');
                 video.srcObject = e.streams[0];
                 video.autoplay = true;
                 document.getElementById('videos').appendChild(video);
-                document.getElementById('status').textContent += ` | 📹 ${e.track.kind}`;
             };
 
-            subscriber.onconnectionstatechange = () => {
-                console.log('🔗 Subscriber state:', subscriber.connectionState);
-                if (subscriber.connectionState === 'connected') {
-                    document.getElementById('status').textContent += ' | ✅ Connected';
-                }
-            };
-
-            // Request subscription
             ws.send(JSON.stringify({ type: 'subscribe' }));
             console.log('📤 Subscribe request sent');
         }
